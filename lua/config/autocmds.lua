@@ -32,17 +32,32 @@ autocmd('TextYankPost', {
     group = yank_group,
     pattern = '*',
     callback = function()
-        vim.highlight.on_yank({
+        -- vim.highlight was renamed vim.hl in 0.11 and is on the removal path.
+        local hl = vim.hl or vim.highlight
+        hl.on_yank({
             higroup = 'IncSearch',
             timeout = 40,
         })
     end,
 })
 
+-- Strip trailing whitespace on save.
+--   * The modifiable guard is load-bearing: this fires for every :w, and on a
+--     non-modifiable buffer (`:checkhealth` output, for one) the substitute
+--     raises E21 and the write reports an error.
+--   * keeppatterns keeps \s\+$ out of the search register, so n after a save
+--     still repeats your own search.
+--   * winsaveview/winrestview keep the cursor and scroll position, which a
+--     bare %s does not.
 autocmd({"BufWritePre"}, {
     group = UserAutoCommands,
     pattern = "*",
-    command = [[%s/\s\+$//e]],
+    callback = function()
+        if not vim.bo.modifiable or vim.bo.readonly then return end
+        local view = vim.fn.winsaveview()
+        vim.cmd([[keeppatterns %s/\s\+$//e]])
+        vim.fn.winrestview(view)
+    end,
 })
 
 autocmd('LspAttach', {
